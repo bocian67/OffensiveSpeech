@@ -21,8 +21,6 @@ nlp = spacy.load("de_core_news_lg")
 # This should be our data
 categories = ["OTHER", "INSULT", "ABUSE", "PROFANITY"]
 
-#twenty_train = fetch_20newsgroups(subset='train', shuffle=True)
-
 
 """
 We performed minimal pre-processing by:

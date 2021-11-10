@@ -1,16 +1,23 @@
 ## for data
+import matplotlib.pyplot as plt
 import numpy as np
-from nltk import download
+import pandas as pd
+import seaborn as sns
+import spacy
 from nltk.corpus import stopwords
+from sklearn import svm, metrics
+from sklearn.ensemble import RandomForestClassifier
 ## for machine learning
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
-from sklearn.linear_model import SGDClassifier
+from sklearn.feature_selection import SelectPercentile, chi2
+from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.model_selection import cross_val_score, GridSearchCV
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import LinearSVC
 from sklearn.pipeline import Pipeline
-import spacy
 
-## for plotting
-## for statistical tests
-download('stopwords')
+#download('stopwords')
 
 # WICHTIG: download im terminal mit:
 # python -m spacy download de_core_news_lg
@@ -19,7 +26,8 @@ nlp = spacy.load("de_core_news_lg")
 ## for explainer
 
 # This should be our data
-categories = ["OTHER", "INSULT", "ABUSE", "PROFANITY"]
+# categories = ["OTHER", "INSULT", "ABUSE", "PROFANITY"]
+categories = ["INSULT", "ABUSE", "PROFANITY"]
 
 
 """
@@ -32,8 +40,18 @@ generic form User;
 • removing stop words using the Python module
 stop-words
 
+TODO:
 SVM weight!
+-> SVM weighting
+-> n-gramme
+-> features like cites
+-> features like #
 """
+
+training_text = []
+training_label = []
+test_text = []
+test_label = []
 
 
 def main():
@@ -42,126 +60,138 @@ def main():
     # Test the model
     test(clf)
 
-
-def clean_text(text):
-    # spaCy lemma
-    # später pipeline durch aufrufe ändern -> performance
-    doc = nlp(text)
-    clean = []
-    for token in doc:
-        word = token.lemma_
-        #print("Text:\t" + token.text)
-        #print("lemma:\t" + word)
-        # Remove mentions & Remove line breaks
-        if not ((word.__contains__("@")) or (word == "|LBR|") or (word.startswith("#"))):
-            clean.append(word)
-            # Remove hashtags
-        if word.startswith("#"):
-            clean.append(word[1:])
-
-    # Display spaCy content in web browser
-    # spacy.displacy.serve(doc, style="dep")
-
-    tweet = " ".join(clean)
-    return tweet
-
-
 def train():
     print("Begin training")
-    training_text = []
-    training_label = []
     # Open the training file
-    with open("train/germeval2018.training.txt", encoding='utf-8') as f:
-        file_lines = f.readlines()
-        # Extract text and insult classification for each line
-        other = 0
-        abuse = 0
-        insult = 0
-        profanity = 0
-        for line in file_lines:
-            splitted_line = line.split("\t")
-            text = splitted_line[0]
-            cleaned_text = clean_text(text)
-            training_text.append(cleaned_text)
-            classification = splitted_line[2].rstrip()
-            if classification == "INSULT":
-                insult += 1
-            elif classification == "OTHER":
-                other += 1
-            elif classification == "ABUSE":
-                abuse += 1
-            elif classification == "PROFANITY":
-                profanity += 1
-            training_label.append(classification)
+    training = open("data/training_text.txt", "r", encoding="utf-8")
+    testing = open("data/training_label.txt", "r", encoding="utf-8")
+    for line in training:
+        text = line.rstrip("\n")
+        training_text.append(text)
 
-        f.close()
-        print("Other: " + str(other))
-        print("Insult: " + str(insult))
-        print("Profanity: " + str(profanity))
-        print("Abuse: " + str(abuse))
+    for line in testing:
+        text = line.rstrip("\n")
+        training_label.append(text)
 
-    text_clf_svm = Pipeline([('vect', CountVectorizer(stop_words=stopwords.words('german'))), ('tfidf', TfidfTransformer()),
-                             ('clf-svm', SGDClassifier(loss='hinge', penalty='l2', alpha=1e-3, random_state=42,
-                                                       n_iter_no_change=5))])
+    training.close()
+    testing.close()
+
+    ## Count vectorizer
+    #count_vect = CountVectorizer(stop_words=stopwords.words("german"))
+    #X_train_counts = count_vect.fit_transform(training_text)
+    ## TD-IDF transformation
+    #tfidf_transformer = TfidfTransformer()
+    #X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
+    ## train svm
+
+    #trainedsvm = svm.SVC(kernel='rbf').fit(X_train_tfidf, training_label)
+#
+    #text_clf_svm = Pipeline([('vect', CountVectorizer(stop_words=stopwords.words('german'))),
+    #                         ('tfidf', TfidfTransformer()),
+    #                         ('clf-svm', SGDClassifier(loss='hinge', penalty='l2', alpha=1e-3, random_state=42,
+    #                                                   n_iter_no_change=5))])
+
+    text_clf_svm = Pipeline([('vect', CountVectorizer(stop_words=stopwords.words('german'), ngram_range=(1,3))),
+                             ('tfidf', TfidfTransformer(use_idf=True)),
+                             ('clf-svm', svm.SVC(kernel='rbf', C=10.0, gamma=0.1, class_weight="balanced"))])
+
+    #C_range = np.logspace(-2, 10, 13)
+    #gamma_range = np.logspace(-9, 3, 13)
+
+    #parameters = {
+    #    'vect__ngram_range': [(1, 1), (1, 2), (1, 3), (1, 4), (1, 5)],
+    #}
+
+    #gs_clf = GridSearchCV(text_clf_svm, parameters, cv=5, n_jobs=-1)
+    #gs_clf = gs_clf.fit(training_text, training_label)
+
+    #print("Best Score: " + str(gs_clf.best_score_))
+    #print("Best Params: \n")
+    #print(gs_clf.best_score_)
+    #for param_name in sorted(parameters.keys()):
+    #    print("%s: %r" % (param_name, gs_clf.best_params_[param_name]))
 
     text_clf_svm = text_clf_svm.fit(training_text, training_label)
+
 
     return text_clf_svm
 
 
 def test(clf):
-    test_text = []
-    test_label = []
-    with open("train/germeval2018.test_.txt", encoding="utf-8") as f:
-        file_lines = f.readlines()
-        # Extract text and insult classification for each line
-        other = 0
-        abuse = 0
-        insult = 0
-        profanity = 0
-        for line in file_lines:
-            splitted_line = line.split("\t")
-            test_text.append(splitted_line[0])
-            classification = splitted_line[2].rstrip()
-            if classification == "INSULT":
-                insult += 1
-            elif classification == "OTHER":
-                other += 1
-            elif classification == "ABUSE":
-                abuse += 1
-            elif classification == "PROFANITY":
-                profanity += 1
-            test_label.append(classification)
+    training = open("data/testing_text.txt", "r", encoding="utf-8")
+    testing = open("data/testing_label.txt", "r", encoding="utf-8")
+    for line in training:
+        text = line.rstrip("\n")
+        test_text.append(text)
 
-        f.close()
-        print("\nOther: " + str(other))
-        print("Insult: " + str(insult))
-        print("Profanity: " + str(profanity))
-        print("Abuse: " + str(abuse))
-    print("Begin test...")
+    for line in testing:
+        text = line.rstrip("\n")
+        test_label.append(text)
+
+    training.close()
+    testing.close()
+
+    ## Count vectorizer
+    #count_vect = CountVectorizer(stop_words=stopwords.words("german"))
+    #X_train_counts = count_vect.fit_transform(test_text)
+    ## TD-IDF transformation
+    #tfidf_transformer = TfidfTransformer()
+    #X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
+    #print("Begin test...")
+    ##predicted_svm = clf.predict(test_text)
+
     predicted_svm = clf.predict(test_text)
 
-    other = 0
-    abuse = 0
-    insult = 0
-    profanity = 0
-    print("\nPredicted:")
-    for type in predicted_svm:
-        if type == "INSULT":
-            insult += 1
-        elif type == "OTHER":
-            other += 1
-        elif type == "ABUSE":
-            abuse += 1
-        elif type == "PROFANITY":
-            profanity += 1
-
-    print("Other: " + str(other))
-    print("Insult: " + str(insult))
-    print("Profanity: " + str(profanity))
-    print("Abuse: " + str(abuse))
-
     print("Support Vector Maschine:\n" + str(np.mean(predicted_svm == test_label)))
+    print(metrics.classification_report(test_label, predicted_svm, target_names = categories))
+
+
+def test_models():
+    models = [
+        RandomForestClassifier(n_estimators=200, max_depth=3, random_state=0),
+        LinearSVC(),
+        MultinomialNB(),
+        LogisticRegression(random_state=0),
+    ]
+    CV = 5
+    cv_df = pd.DataFrame(index=range(CV * len(models)))
+
+    # Open the training file
+    # Open the training file
+    training = open("data/training_text.txt", "r", encoding="utf-8")
+    testing = open("data/training_label.txt", "r", encoding="utf-8")
+    for line in training:
+        text = line.rstrip("\n")
+        training_text.append(text)
+
+    for line in testing:
+        text = line.rstrip("\n")
+        training_label.append(text)
+
+    training.close()
+    testing.close()
+
+    print("Begin training")
+
+    # Count vectorizer
+    count_vect = CountVectorizer(stop_words=stopwords.words("german"))
+    X_train_counts = count_vect.fit_transform(training_text)
+    # TD-IDF transformation
+    tfidf_transformer = TfidfTransformer()
+    X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
+
+    entries = []
+    for model in models:
+        model_name = model.__class__.__name__
+        print("Model: " + model_name)
+        accuracies = cross_val_score(model, X_train_tfidf, training_label, scoring='accuracy', cv=CV)
+        for fold_idx, accuracy in enumerate(accuracies):
+            entries.append((model_name, fold_idx, accuracy))
+    cv_df = pd.DataFrame(entries, columns=['model_name', 'fold_idx', 'accuracy'])
+    sns.boxplot(x='model_name', y='accuracy', data=cv_df)
+    sns.stripplot(x='model_name', y='accuracy', data=cv_df,
+                  size=8, jitter=True, edgecolor="gray", linewidth=2)
+    plt.show()
 
 
 if __name__ == '__main__':

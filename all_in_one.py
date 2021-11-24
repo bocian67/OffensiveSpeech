@@ -5,17 +5,20 @@ import numpy as np
 import pandas as pd
 import regex
 import spacy
+from matplotlib.colors import Normalize
 from nltk.corpus import stopwords
+from nltk.metrics import scores
 from sklearn import svm, metrics
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 ## for machine learning
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer, TfidfVectorizer
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.preprocessing import MinMaxScaler
 import emojis
-from preprocess_constants import preprocess_emojis
+from preprocess_constants import *
+import matplotlib.pyplot as plt
 
 # download('stopwords')
 
@@ -30,7 +33,7 @@ categories = ["INSULT", "ABUSE", "PROFANITY", "OTHER"]
 # Scores
 punctuation_score_dict = {
     "!": 1,
-    "?": 1,
+    "?": 0.7,
     "default_emoji": 0.1
 }
 
@@ -43,9 +46,22 @@ training_text = []
 training_label = []
 test_text = []
 test_label = []
+insult_list = []
+
+
+class MidpointNormalize(Normalize):
+    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+        self.midpoint = midpoint
+        Normalize.__init__(self, vmin, vmax, clip)
+
+    def __call__(self, value, clip=None):
+        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x, y))
 
 
 def main():
+    global insult_list
+    insult_list = preprocess_insults()
     emoji_scores = preprocess_emojis()
     punctuation_score_dict.update(emoji_scores)
     # Train the model
@@ -126,6 +142,8 @@ def get_feature_data(text):
 
     emoji_scores = []
 
+    insult_count = []
+
     # Add features
     for item in text:
         # spaCy lemma
@@ -138,6 +156,7 @@ def get_feature_data(text):
         question_mark_score = 0
         punctuation = []
         tweet_emojis = []
+        insult_item_count = 0
         scaled_emoji_feature = 0
 
         # Emoji classification
@@ -161,6 +180,7 @@ def get_feature_data(text):
             # Is text a hashtag
             elif t.startswith("#"):
                 lemma = t[1:]
+                t = t[1:]
                 hashtag_count += 1
             # Is text "!" or "?"
             elif t == "!":
@@ -171,9 +191,14 @@ def get_feature_data(text):
                 punctuation.append(t)
                 question_mark_score += 1
 
+            #########
+            # Check insults from wordlist
+            if t in insult_list:
+                insult_item_count += 1
+
             # Add text if it is not LBR
             if t != "|LBR|":
-                clean.append(lemma)
+                clean.append(lemma.lower())
 
         # [.. "!", "!", "hallo", "?", "!", ...]
         # Merkel muss weg! rafft ihr es noch?!?!?!?
@@ -191,6 +216,7 @@ def get_feature_data(text):
         hashtags.append(hashtag_count)
         mentions.append(mention_count)
         training_text_clean.append(" ".join(clean))
+        insult_count.append(insult_item_count)
 
     data_frame = pd.DataFrame(
         {
@@ -198,7 +224,8 @@ def get_feature_data(text):
             "hashtags": hashtags,
             "mentions": mentions,
             "punctuation_score": punctuation_scores,
-            "emoji_scores": emoji_scores
+            "emoji_scores": emoji_scores,
+            "insult_count": insult_count
         }
     )
     return data_frame
@@ -218,19 +245,20 @@ def train():
 
     text_clf_svm = Pipeline([
         ('preprocessor', preprocessor),
-        ('clf-svm', svm.SVC(class_weight=None, C=5, gamma=0.5, kernel="rbf"))
+        ('clf-svm', svm.SVC(class_weight=None, C=7, gamma=0.1, kernel="rbf"))
     ])
-
+    ######################################################
     # Adjust parameters properly
     # TODO: https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html
 
-    C_range = [1, 3, 4, 5, 6, 7]
-    gamma_range = [0.1, 0.2, 0.5, 0.7, 1, 1.5]
-
-    parameters = {
-        'clf-svm__C': C_range,
-        'clf-svm__gamma': gamma_range,
-    }
+    #print("Starting GridSearchCV...")
+    #start = datetime.now()
+    #C_range = [1, 3, 5, 7, 9, 11]
+    #gamma_range = [0.1, 0.3, 0.5, 0.7, 0.9, 1.1]
+    #parameters = {
+    #    'clf-svm__C': C_range,
+    #    'clf-svm__gamma': gamma_range,
+    #}
 
     #gs_clf = GridSearchCV(text_clf_svm, parameters, cv=5, n_jobs=-1)
     #gs_clf = gs_clf.fit(data_frame, training_label)
@@ -239,7 +267,31 @@ def train():
     #print(gs_clf.best_score_)
     #for param_name in sorted(parameters.keys()):
     #    print("%s: %r" % (param_name, gs_clf.best_params_[param_name]))
-
+    #end = datetime.now()
+    #duration = end - start
+    #print("GridSearchCV duration: " + str(duration))
+    #print(
+    #    "The best parameters are %s with a score of %0.2f"
+    #    % (gs_clf.best_params_, gs_clf.best_score_)
+    #)
+    #scores = gs_clf.cv_results_["mean_test_score"].reshape(len(C_range), len(gamma_range))
+    #plt.figure(figsize=(8, 6))
+    #plt.subplots_adjust(left=0.2, right=0.95, bottom=0.15, top=0.95)
+    #plt.imshow(
+    #    scores,
+    #    interpolation="nearest",
+    #    cmap=plt.cm.hot
+    #)
+    #plt.xlabel("gamma")
+    #plt.ylabel("C")
+    #plt.colorbar()
+    #plt.xticks(np.arange(len(gamma_range)), gamma_range, rotation=45)
+    #plt.yticks(np.arange(len(C_range)), C_range)
+    #plt.title("Accuracy")
+    #plt.show()
+    #
+    #   Plot the accuracy
+    ##########################
     print("Make model fit...")
     start = datetime.now()
     text_clf_svm = text_clf_svm.fit(data_frame, training_label)

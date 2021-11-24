@@ -1,4 +1,5 @@
 import csv
+import re
 
 
 def main():
@@ -30,5 +31,21 @@ def preprocess_insults():
     return insult_list
 
 
+def encode_unicode_to_emoji():
+    with open("train/germeval2019.training.emojis.txt", "w", encoding="utf-8") as new_f:
+        with open("train/germeval2019.training_subtask1_2_korrigiert.txt", encoding="utf-8") as f:
+            lines = f.readlines()
+            for line in lines:
+                new_line = re.sub("<U\+\w+>", replace_with_emoji, line)
+                new_f.write(new_line)
+            f.close()
+        new_f.close()
+
+
+def replace_with_emoji(unicode_emoji):
+    code = unicode_emoji.group()
+    return chr(int(code[3:-1], 16))
+
+
 if __name__ == "__main__":
-    main()
+    encode_unicode_to_emoji()

@@ -91,9 +91,9 @@ def get_pos(tweet):
 
 
 def get_data():
+    # Get training data
     print("Obtain training data...")
     with open("train/germeval2018.training.txt", encoding='utf-8') as f:
-        # with open("train/train_.txt", encoding='utf-8') as f:
         file_lines = f.readlines()
         # Extract text and insult classification for each line
         for line in file_lines:
@@ -107,9 +107,25 @@ def get_data():
             training_label.append(classification)
         f.close()
 
+    with open("train/germeval2019.training.emojis.txt", encoding='utf-8') as f:
+        file_lines = f.readlines()
+        # Extract text and insult classification for each line
+        for line in file_lines:
+            splitted_line = line.split("\t")
+            text = splitted_line[0]
+            classification = splitted_line[2].rstrip()
+            # if classification != "OTHER":
+            #    training_text.append(text)
+            #    training_label.append(classification)
+            training_text.append(text)
+            training_label.append(classification)
+        f.close()
+
+    print("[*] Having " + str(len(training_text)) + " TRAINING samples")
+
+    # Get testing data
     print("Obtain testing data...")
     with open("train/germeval2018.test_.txt", encoding="utf-8") as f:
-        # with open("train/test_.txt", encoding='utf-8') as f:
         file_lines = f.readlines()
         # Extract text and insult classification for each line
         for line in file_lines:
@@ -122,6 +138,7 @@ def get_data():
             test_text.append(text)
             test_label.append(classification)
         f.close()
+    print("[*] Having " + str(len(test_text)) + " TESTING samples")
 
 
 def get_feature_data(text):

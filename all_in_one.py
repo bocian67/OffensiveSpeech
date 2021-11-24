@@ -19,6 +19,7 @@ from sklearn.preprocessing import MinMaxScaler
 import emojis
 from preprocess_constants import *
 import matplotlib.pyplot as plt
+from get_dataset import get_splitted_data
 
 # download('stopwords')
 
@@ -29,7 +30,7 @@ nlp = spacy.load("de_core_news_lg")
 ## Constants
 # This should be our data
 categories = ["INSULT", "ABUSE", "PROFANITY", "OTHER"]
-# categories = ["INSULT", "ABUSE", "PROFANITY"]
+
 # Scores
 punctuation_score_dict = {
     "!": 1,
@@ -88,57 +89,6 @@ def get_pos(tweet):
     for token in doc:
         text += str(token.text) + "_" + str(token.tag_) + " "
     return text
-
-
-def get_data():
-    # Get training data
-    print("Obtain training data...")
-    with open("train/germeval2018.training.txt", encoding='utf-8') as f:
-        file_lines = f.readlines()
-        # Extract text and insult classification for each line
-        for line in file_lines:
-            splitted_line = line.split("\t")
-            text = splitted_line[0]
-            classification = splitted_line[2].rstrip()
-            # if classification != "OTHER":
-            #    training_text.append(text)
-            #    training_label.append(classification)
-            training_text.append(text)
-            training_label.append(classification)
-        f.close()
-
-    with open("train/germeval2019.training.emojis.txt", encoding='utf-8') as f:
-        file_lines = f.readlines()
-        # Extract text and insult classification for each line
-        for line in file_lines:
-            splitted_line = line.split("\t")
-            text = splitted_line[0]
-            classification = splitted_line[2].rstrip()
-            # if classification != "OTHER":
-            #    training_text.append(text)
-            #    training_label.append(classification)
-            training_text.append(text)
-            training_label.append(classification)
-        f.close()
-
-    print("[*] Having " + str(len(training_text)) + " TRAINING samples")
-
-    # Get testing data
-    print("Obtain testing data...")
-    with open("train/germeval2018.test_.txt", encoding="utf-8") as f:
-        file_lines = f.readlines()
-        # Extract text and insult classification for each line
-        for line in file_lines:
-            splitted_line = line.split("\t")
-            text = splitted_line[0]
-            classification = splitted_line[2].rstrip()
-            # if classification != "OTHER":
-            #    test_text.append(text)
-            #    test_label.append(classification)
-            test_text.append(text)
-            test_label.append(classification)
-        f.close()
-    print("[*] Having " + str(len(test_text)) + " TESTING samples")
 
 
 def get_feature_data(text):
@@ -249,7 +199,11 @@ def get_feature_data(text):
 
 
 def train():
-    get_data()
+    global training_text
+    global test_text
+    global training_label
+    global test_label
+    training_text, training_label, test_text, test_label = get_splitted_data(0.7)
     print("Get training features...")
     data_frame = get_feature_data(training_text)
 

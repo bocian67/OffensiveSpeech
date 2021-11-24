@@ -1,2 +1,10 @@
 .idea/
-train/
+train/train_.txt
+
+train/test_.txt
+
+train/germeval2019.training_subtask1_2_korrigiert.txt
+
+*.png
+
+*.pyc

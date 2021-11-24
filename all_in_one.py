@@ -1,25 +1,17 @@
-## for data
-from datetime import datetime
-
-import numpy as np
+import emojis
 import pandas as pd
-import regex
 import spacy
 from matplotlib.colors import Normalize
 from nltk.corpus import stopwords
-from nltk.metrics import scores
 from sklearn import svm, metrics
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
-## for machine learning
-from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer, TfidfVectorizer
-from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
-from sklearn.pipeline import Pipeline, FeatureUnion
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
-import emojis
-from preprocess_constants import *
-import matplotlib.pyplot as plt
+
+from evaluation import *
 from get_dataset import get_splitted_data
+from preprocess_constants import *
 
 # download('stopwords')
 
@@ -218,51 +210,21 @@ def train():
         ('preprocessor', preprocessor),
         ('clf-svm', svm.SVC(class_weight=None, C=7, gamma=0.1, kernel="rbf"))
     ])
-    ######################################################
-    # Adjust parameters properly
-    # TODO: https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html
 
-    #print("Starting GridSearchCV...")
-    #start = datetime.now()
-    #C_range = [1, 3, 5, 7, 9, 11]
-    #gamma_range = [0.1, 0.3, 0.5, 0.7, 0.9, 1.1]
-    #parameters = {
-    #    'clf-svm__C': C_range,
-    #    'clf-svm__gamma': gamma_range,
-    #}
+    ###
+    # Gridsearch options
+    # C_range = [1, 3, 5, 7, 9, 11]
+    # gamma_range = [0.1, 0.3, 0.5, 0.7, 0.9, 1.1]
+    # parameters = {
+    #     'clf-svm__C': C_range,
+    #     'clf-svm__gamma': gamma_range,
+    # }
+    # search_for_parameters(text_clf_svm, data_frame, training_label, parameters)
 
-    #gs_clf = GridSearchCV(text_clf_svm, parameters, cv=5, n_jobs=-1)
-    #gs_clf = gs_clf.fit(data_frame, training_label)
-    #print("Best Score: " + str(gs_clf.best_score_))
-    #print("Best Params: \n")
-    #print(gs_clf.best_score_)
-    #for param_name in sorted(parameters.keys()):
-    #    print("%s: %r" % (param_name, gs_clf.best_params_[param_name]))
-    #end = datetime.now()
-    #duration = end - start
-    #print("GridSearchCV duration: " + str(duration))
-    #print(
-    #    "The best parameters are %s with a score of %0.2f"
-    #    % (gs_clf.best_params_, gs_clf.best_score_)
-    #)
-    #scores = gs_clf.cv_results_["mean_test_score"].reshape(len(C_range), len(gamma_range))
-    #plt.figure(figsize=(8, 6))
-    #plt.subplots_adjust(left=0.2, right=0.95, bottom=0.15, top=0.95)
-    #plt.imshow(
-    #    scores,
-    #    interpolation="nearest",
-    #    cmap=plt.cm.hot
-    #)
-    #plt.xlabel("gamma")
-    #plt.ylabel("C")
-    #plt.colorbar()
-    #plt.xticks(np.arange(len(gamma_range)), gamma_range, rotation=45)
-    #plt.yticks(np.arange(len(C_range)), C_range)
-    #plt.title("Accuracy")
-    #plt.show()
-    #
-    #   Plot the accuracy
-    ##########################
+    ###
+    # Plot GridSearch options
+    # get_plot(gamma_range, C_range)
+
     print("Make model fit...")
     start = datetime.now()
     text_clf_svm = text_clf_svm.fit(data_frame, training_label)

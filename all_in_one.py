@@ -213,17 +213,18 @@ def train():
 
     ###
     # Gridsearch options
-    # C_range = [1, 3, 5, 7, 9, 11]
-    # gamma_range = [0.1, 0.3, 0.5, 0.7, 0.9, 1.1]
-    # parameters = {
-    #     'clf-svm__C': C_range,
-    #     'clf-svm__gamma': gamma_range,
-    # }
-    # search_for_parameters(text_clf_svm, data_frame, training_label, parameters)
+    #C_range = [2, 3, 4, 5, 6, 7, 8]
+    #gamma_range = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+    #parameters = {
+    #    'clf-svm__C': C_range,
+    #    'clf-svm__gamma': gamma_range,
+    #}
+    #search_for_parameters(text_clf_svm, data_frame, training_label, parameters)
 
     ###
     # Plot GridSearch options
     # get_plot(gamma_range, C_range)
+    #get_plot(gamma_range, C_range)
 
     print("Make model fit...")
     start = datetime.now()

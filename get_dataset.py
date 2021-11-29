@@ -109,6 +109,11 @@ def get_splitted_data(training_part):
     testing_text += other_text[other_training_count:]
     testing_label += ["OTHER"] * other_testing_count
 
+    print("Profanity: " + str(len(profanity_text)))
+    print("Insult: " + str(len(insult_text)))
+    print("Abuse: " + str(len(abusive_text)))
+    print("Others: " + str(len(other_text)))
+
     print("[*] Having " + str(len(training_text)) + " TRAINING samples")
     print("[*] Having " + str(len(testing_text)) + " TESTING samples")
 

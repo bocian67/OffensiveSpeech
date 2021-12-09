@@ -151,21 +151,24 @@ def get_feature_data(text):
             if t != "|LBR|":
                 clean.append(lemma.lower())
 
+        clean_text = " ".join(clean)
+        doc = nlp(clean_text)
+
         punctuation_score = scale_feature(punctuation)
         punctuation_scores.append(punctuation_score)
         exclamation_mark_numbers.append(exclamation_mark_score)
         question_mark_numbers.append(question_mark_score)
         hashtags.append(hashtag_count)
         mentions.append(mention_count)
-        training_text_clean.append(" ".join(clean))
+        training_text_clean.append(clean_text)
         insult_count.append(insult_item_count)
 
     data_frame = pd.DataFrame(
         {
             "tweets": training_text_clean,
-            #"hashtags": hashtags,
-            #"mentions": mentions,
-            #"punctuation_score": punctuation_scores,
+            "hashtags": hashtags,
+            "mentions": mentions,
+            "punctuation_score": punctuation_scores,
             "emoji_scores": emoji_scores,
             "insult_count": insult_count
         }
@@ -189,7 +192,7 @@ def train():
     encoded_labels = label_encoder.fit_transform(training_label)
 
     # Oversample profanity to 800 samples
-    strategy = {3: 800}
+    strategy = {3: 1000}
 
     oversample = SMOTE(sampling_strategy=strategy, n_jobs=-1)
     oversampled_data, oversampled_label = oversample.fit_resample(pre_data, encoded_labels)

@@ -10,6 +10,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 
+import evaluation
 from evaluation import *
 from get_dataset import get_splitted_data
 from preprocess_constants import *
@@ -27,14 +28,9 @@ categories = ["INSULT", "ABUSE", "PROFANITY", "OTHER"]
 # Scores
 punctuation_score_dict = {
     "!": 1,
-    "?": 0.7,
-    "default_emoji": 0.1
+    "?": 1,
+    "default_emoji": 0
 }
-
-"""
-TODO:
--> SVM weighting
-"""
 
 training_text = []
 training_label = []
@@ -44,15 +40,16 @@ insult_list = []
 
 label_encoder = LabelEncoder()
 
+preprocessor = ColumnTransformer(
+        [
+            ('tweets', TfidfVectorizer(stop_words=stopwords.words("german"), ngram_range=(1, 1)), 'tweets'),
+            ('scaler', MinMaxScaler(), ["hashtags", "mentions"])
+        ],
+        remainder='passthrough', verbose_feature_names_out=True, n_jobs=-1)
 
-class MidpointNormalize(Normalize):
-    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
-        self.midpoint = midpoint
-        Normalize.__init__(self, vmin, vmax, clip)
-
-    def __call__(self, value, clip=None):
-        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
-        return np.ma.masked_array(np.interp(value, x, y))
+svm_model = Pipeline([
+        ('clf-svm', svm.SVC(class_weight=None, C=6, gamma=0.15, kernel="rbf"))
+    ])
 
 
 def main():
@@ -61,9 +58,9 @@ def main():
     emoji_scores = preprocess_emojis()
     punctuation_score_dict.update(emoji_scores)
     # Train the model
-    pre, clf = train()
+    train()
     # Test the model
-    test(pre, clf)
+    test()
 
 
 # feature_list: ["!", "?", "!", ...]
@@ -76,14 +73,6 @@ def scale_feature(feature_list):
             emoji_score = punctuation_score_dict["default_emoji"]
         score += (0.5 ** position) * emoji_score
     return score
-
-
-def get_pos(tweet):
-    text = ""
-    doc = nlp(tweet)
-    for token in doc:
-        text += str(token.text) + "_" + str(token.tag_) + " "
-    return text
 
 
 def get_feature_data(text):
@@ -162,19 +151,10 @@ def get_feature_data(text):
             if t != "|LBR|":
                 clean.append(lemma.lower())
 
-        # [.. "!", "!", "hallo", "?", "!", ...]
-        # Merkel muss weg! rafft ihr es noch?!?!?!?
-        # @USER gehts noch?!
-
-        # We give every exclamation/question mark a penalty
-        # We dont care if they are single or in a group,
-        # just the total mass is counting
         punctuation_score = scale_feature(punctuation)
-
         punctuation_scores.append(punctuation_score)
         exclamation_mark_numbers.append(exclamation_mark_score)
         question_mark_numbers.append(question_mark_score)
-
         hashtags.append(hashtag_count)
         mentions.append(mention_count)
         training_text_clean.append(" ".join(clean))
@@ -183,9 +163,9 @@ def get_feature_data(text):
     data_frame = pd.DataFrame(
         {
             "tweets": training_text_clean,
-            "hashtags": hashtags,
-            "mentions": mentions,
-            "punctuation_score": punctuation_scores,
+            #"hashtags": hashtags,
+            #"mentions": mentions,
+            #"punctuation_score": punctuation_scores,
             "emoji_scores": emoji_scores,
             "insult_count": insult_count
         }
@@ -198,32 +178,21 @@ def train():
     global test_text
     global training_label
     global test_label
+    global preprocessor
+    global svm_model
 
     training_text, training_label, test_text, test_label = get_splitted_data(0.7)
     print("Get training features...")
 
     data_frame = get_feature_data(training_text)
-
-    preprocessor = ColumnTransformer(
-        [
-            ('tweets', TfidfVectorizer(stop_words=stopwords.words("german"), ngram_range=(1, 1)), 'tweets'),
-            ('scaler', MinMaxScaler(), ["hashtags", "mentions"])
-        ],
-        remainder='passthrough', verbose_feature_names_out=True, n_jobs=-1)
-
     pre_data = preprocessor.fit_transform(data_frame)
-
     encoded_labels = label_encoder.fit_transform(training_label)
 
+    # Oversample profanity to 800 samples
     strategy = {3: 800}
 
-    # TODO: Change SMOTE algorithm
     oversample = SMOTE(sampling_strategy=strategy, n_jobs=-1)
     oversampled_data, oversampled_label = oversample.fit_resample(pre_data, encoded_labels)
-
-    text_clf_svm = Pipeline([
-        ('clf-svm', svm.SVC(class_weight=None, C=7, gamma=0.1, kernel="rbf"))
-    ])
 
     ###
     # Gridsearch options
@@ -242,26 +211,29 @@ def train():
 
     print("Make model fit...")
     start = datetime.now()
-    text_clf_svm = text_clf_svm.fit(oversampled_data, oversampled_label)
+    svm_model = svm_model.fit(oversampled_data, oversampled_label)
     end = datetime.now()
     duration = end - start
     print("Fit duration: " + str(duration))
-    return preprocessor, text_clf_svm
 
 
-def test(pre, clf):
+def test():
+    global svm_model
+    global preprocessor
     print("Get testing features...")
     data_frame = get_feature_data(test_text)
     print("Predict...")
 
-    fitted_data = pre.transform(data_frame)
+    fitted_data = preprocessor.transform(data_frame)
 
     encoded_label = label_encoder.transform(test_label)
-
-    predicted_svm = clf.predict(fitted_data)
+    mapping = dict(zip(label_encoder.transform(label_encoder.classes_), label_encoder.classes_))
+    predicted_svm = svm_model.predict(fitted_data)
 
     print("Support Vector Maschine:\n" + str(np.mean(predicted_svm == encoded_label)))
     print(metrics.classification_report(encoded_label, predicted_svm))
+
+    evaluation.evaluateModelAccuracy(predicted_svm, encoded_label, mapping)
 
 
 if __name__ == '__main__':

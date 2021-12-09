@@ -37,15 +37,12 @@ def get_data():
     with open("train/germeval2018.training.txt", encoding='utf-8') as f:
         add_text_to_classified_data(f)
         f.close()
-
     with open("train/germeval2019.training.emojis.txt", encoding='utf-8') as f:
         add_text_to_classified_data(f)
         f.close()
-
     with open("train/germeval2018.test_.txt", encoding="utf-8") as f:
         add_text_to_classified_data(f)
         f.close()
-
     with open("train/testdaten_2019.txt", encoding="utf-8") as f:
         add_text_to_classified_data(f)
         f.close()

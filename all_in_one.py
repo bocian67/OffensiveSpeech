@@ -83,7 +83,7 @@ def get_pos(tweet):
     return text
 
 
-def get_feature_data(text):
+def get_feature_data(text_collection):
     # Clean text data (lemma)
     training_text_clean = []
 
@@ -104,10 +104,10 @@ def get_feature_data(text):
     insult_count = []
 
     # Add features
-    for item in text:
+    for text in text_collection:
         # spaCy lemma
         # später pipeline durch aufrufe ändern -> performance
-        doc = nlp(item)
+        doc = nlp(text)
         clean = []
         hashtag_count = 0
         mention_count = 0
@@ -121,7 +121,7 @@ def get_feature_data(text):
         # Emoji classification
         # Classification Score was not improved; try to use categorical attributes? Maybe with threshold?
         # or use transformer to alter the scores that the SVC use it properly to classify
-        emoji_iter = emojis.iter(item)
+        emoji_iter = emojis.iter(text)
         for emoji in emoji_iter:
             tweet_emojis.append(emoji)
         if len(tweet_emojis) > 0:
@@ -172,9 +172,11 @@ def get_feature_data(text):
         exclamation_mark_numbers.append(exclamation_mark_score)
         question_mark_numbers.append(question_mark_score)
 
+        cleaned_input_text = " ".join(clean)
+
         hashtags.append(hashtag_count)
         mentions.append(mention_count)
-        training_text_clean.append(" ".join(clean))
+        training_text_clean.append(cleaned_input_text)
         insult_count.append(insult_item_count)
 
     data_frame = pd.DataFrame(
@@ -208,13 +210,13 @@ def train():
 
     text_clf_svm = Pipeline([
         ('preprocessor', preprocessor),
-        ('clf-svm', svm.SVC(class_weight=None, C=7, gamma=0.1, kernel="rbf"))
+        ('clf-svm', svm.SVC(class_weight=None, C=6, gamma=0.15, kernel="rbf"))
     ])
 
     ###
     # Gridsearch options
-    #C_range = [2, 3, 4, 5, 6, 7, 8]
-    #gamma_range = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+    #C_range = [2, 4, 6, 8, 10, 14, 20]
+    #gamma_range = [0.05, 0.1, 0.15, 0.2, 0.4, 1, 2, 5]
     #parameters = {
     #    'clf-svm__C': C_range,
     #    'clf-svm__gamma': gamma_range,
@@ -223,7 +225,6 @@ def train():
 
     ###
     # Plot GridSearch options
-    # get_plot(gamma_range, C_range)
     #get_plot(gamma_range, C_range)
 
     print("Make model fit...")

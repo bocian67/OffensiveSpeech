@@ -55,7 +55,6 @@ def get_plot(gamma_range, C_range):
 
 # Check how accurate our model was, which categories get switched most
 def evaluateModelAccuracy(predicted, original, mapping):
-    colors = ["red", "green", "blue", "yellow"]
     insult = {
         'INSULT': 0,
         'ABUSE':0,
@@ -94,10 +93,10 @@ def evaluateModelAccuracy(predicted, original, mapping):
         else:
             other[mapping[predicted[i]]] += 1
 
-    insult = convert_abs_to_rel(insult)
-    abuse = convert_abs_to_rel(abuse)
-    profanity = convert_abs_to_rel(profanity)
-    other = convert_abs_to_rel(other)
+    #insult = convert_abs_to_rel(insult)
+    #abuse = convert_abs_to_rel(abuse)
+    #profanity = convert_abs_to_rel(profanity)
+    #other = convert_abs_to_rel(other)
 
     print(insult)
     print(abuse)

@@ -192,7 +192,7 @@ def train():
     encoded_labels = label_encoder.fit_transform(training_label)
 
     # Oversample profanity to 800 samples
-    strategy = {3: 1000}
+    strategy = {1: 2500, 3: 1000}
 
     oversample = SMOTE(sampling_strategy=strategy, n_jobs=-1)
     oversampled_data, oversampled_label = oversample.fit_resample(pre_data, encoded_labels)

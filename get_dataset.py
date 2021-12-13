@@ -1,3 +1,4 @@
+import math
 import random
 
 training_text = []
@@ -115,12 +116,3 @@ def get_splitted_data(training_part):
     print("[*] Having " + str(len(testing_text)) + " TESTING samples")
 
     return training_text, training_label, testing_text, testing_label
-
-
-
-
-
-
-
-
-

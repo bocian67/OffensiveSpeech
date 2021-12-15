@@ -13,7 +13,7 @@ from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 
 import evaluation
 from evaluation import *
-from get_dataset import get_splitted_data
+from get_dataset import get_data
 from preprocess_constants import *
 
 # download('stopwords')
@@ -58,7 +58,7 @@ def main():
     insult_list = preprocess_insults()
     emoji_scores = preprocess_emojis()
     punctuation_score_dict.update(emoji_scores)
-    training_text_full, training_label_full, test_text, test_label = get_splitted_data(1)
+    training_text_full, training_label_full, test_text, test_label = get_data()
     scf = StratifiedKFold(n_splits=10)
     for training_index, test_index in scf.split(training_text_full, training_label_full):
         training_text = [training_text_full[index] for index in training_index]
@@ -70,9 +70,6 @@ def main():
         train()
         # Test the model
         test()
-
-
-
 
 
 # feature_list: ["!", "?", "!", ...]
@@ -210,21 +207,6 @@ def train():
 
     oversample = SMOTE(sampling_strategy=strategy, n_jobs=-1)
     oversampled_data, oversampled_label = oversample.fit_resample(pre_data, encoded_labels)
-
-    ###
-    # Gridsearch options
-    #C_range = [2, 3, 4, 5, 6, 7, 8]
-    #gamma_range = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
-    #parameters = {
-    #    'clf-svm__C': C_range,
-    #    'clf-svm__gamma': gamma_range,
-    #}
-    #search_for_parameters(text_clf_svm, data_frame, training_label, parameters)
-
-    ###
-    # Plot GridSearch options
-    # get_plot(gamma_range, C_range)
-    #get_plot(gamma_range, C_range)
 
     print("Make model fit...")
     start = datetime.now()

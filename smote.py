@@ -1,7 +1,7 @@
 import emojis
 import pandas as pd
 import spacy
-from imblearn.over_sampling import SMOTE
+from imblearn.over_sampling import SMOTE, SVMSMOTE
 from matplotlib.colors import Normalize
 from nltk.corpus import stopwords
 from sklearn import svm, metrics
@@ -12,7 +12,7 @@ from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 
 import evaluation
 from evaluation import *
-from get_dataset import get_splitted_data
+from get_dataset import get_data
 from preprocess_constants import *
 
 # download('stopwords')
@@ -48,7 +48,7 @@ preprocessor = ColumnTransformer(
         remainder='passthrough', verbose_feature_names_out=True, n_jobs=-1)
 
 svm_model = Pipeline([
-        ('clf-svm', svm.SVC(class_weight=None, C=6, gamma=0.15, kernel="rbf"))
+        ('clf-svm', svm.SVC(class_weight=None, C=6, gamma=0.35, kernel="rbf"))
     ])
 
 
@@ -184,7 +184,7 @@ def train():
     global preprocessor
     global svm_model
 
-    training_text, training_label, test_text, test_label = get_splitted_data(0.7)
+    training_text, training_label, test_text, test_label = get_data()
     print("Get training features...")
 
     data_frame = get_feature_data(training_text)
@@ -194,22 +194,21 @@ def train():
     # Oversample profanity to 800 samples
     strategy = {1: 2500, 3: 1000}
 
-    oversample = SMOTE(sampling_strategy=strategy, n_jobs=-1)
+    oversample = SVMSMOTE(sampling_strategy=strategy, n_jobs=-1)
     oversampled_data, oversampled_label = oversample.fit_resample(pre_data, encoded_labels)
 
     ###
     # Gridsearch options
-    #C_range = [2, 3, 4, 5, 6, 7, 8]
-    #gamma_range = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+    #C_range = [2, 4, 6, 8, 10, 12, 14]
+    #gamma_range = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35]
     #parameters = {
     #    'clf-svm__C': C_range,
     #    'clf-svm__gamma': gamma_range,
     #}
-    #search_for_parameters(text_clf_svm, data_frame, training_label, parameters)
+    #search_for_parameters(svm_model, oversampled_data, oversampled_label, parameters)
 
-    ###
-    # Plot GridSearch options
-    # get_plot(gamma_range, C_range)
+    ####
+    ## Plot GridSearch options
     #get_plot(gamma_range, C_range)
 
     print("Make model fit...")

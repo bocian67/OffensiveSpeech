@@ -93,11 +93,7 @@ def evaluateModelAccuracy(predicted, original, mapping):
         else:
             other[mapping[predicted[i]]] += 1
 
-    #insult = convert_abs_to_rel(insult)
-    #abuse = convert_abs_to_rel(abuse)
-    #profanity = convert_abs_to_rel(profanity)
-    #other = convert_abs_to_rel(other)
-
+    # Absolute Plot
     print(insult)
     print(abuse)
     print(profanity)
@@ -119,9 +115,36 @@ def evaluateModelAccuracy(predicted, original, mapping):
     ax.bar(categories, other_list, 0.35, bottom=bottom_list, label="OTHER")
 
     plt.legend()
-    ax.set_title("Categorization overview")
-    ax.set_xlabel("Categories")
-    ax.set_ylabel("Classification")
+    ax.set_title("Kategorische Übersicht (Absolute Werte)")
+    ax.set_xlabel("Kategorien")
+    ax.set_ylabel("Klassifikation")
+    plt.show()
+
+    # Relative Plot
+    insult = convert_abs_to_rel(insult)
+    abuse = convert_abs_to_rel(abuse)
+    profanity = convert_abs_to_rel(profanity)
+    other = convert_abs_to_rel(other)
+    fig, ax = plt.subplots()
+    insult_list = np.array([insult["INSULT"], abuse["INSULT"], profanity["INSULT"], other["INSULT"]])
+    abuse_list = np.array([insult["ABUSE"], abuse["ABUSE"], profanity["ABUSE"], other["ABUSE"]])
+    profanity_list = np.array([insult["PROFANITY"], abuse["PROFANITY"], profanity["PROFANITY"], other["PROFANITY"]])
+    other_list = np.array([insult["OTHER"], abuse["OTHER"], profanity["OTHER"], other["OTHER"]])
+
+    bottom_list = np.array([0.0, 0.0, 0.0, 0.0])
+
+    ax.bar(categories, insult_list, 0.35, label="INSULT")
+    bottom_list = np.add(bottom_list, insult_list)
+    ax.bar(categories, abuse_list, 0.35, bottom=bottom_list, label="ABUSE")
+    bottom_list = np.add(bottom_list, abuse_list)
+    ax.bar(categories, profanity_list, 0.35, bottom=bottom_list, label="PROFANITY")
+    bottom_list = np.add(bottom_list, profanity_list)
+    ax.bar(categories, other_list, 0.35, bottom=bottom_list, label="OTHER")
+
+    plt.legend()
+    ax.set_title("Kategorische Übersicht (Relative Werte)")
+    ax.set_xlabel("Kategorien")
+    ax.set_ylabel("Klassifikation")
     plt.show()
 
 

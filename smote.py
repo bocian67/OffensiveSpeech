@@ -40,6 +40,9 @@ insult_list = []
 
 label_encoder = LabelEncoder()
 
+svm_C = 8
+svm_gamma = 0.4
+
 preprocessor = ColumnTransformer(
         [
             ('tweets', TfidfVectorizer(stop_words=stopwords.words("german"), ngram_range=(1, 1)), 'tweets'),
@@ -48,19 +51,24 @@ preprocessor = ColumnTransformer(
         remainder='passthrough', verbose_feature_names_out=True, n_jobs=-1)
 
 svm_model = Pipeline([
-        ('clf-svm', svm.SVC(class_weight=None, C=6, gamma=0.35, kernel="rbf"))
+        ('clf-svm', svm.SVC(class_weight=None, C=svm_C, gamma=svm_gamma, kernel="rbf"))
     ])
 
 
 def main():
+    start_time = datetime.now()
     global insult_list
     insult_list = preprocess_insults()
     emoji_scores = preprocess_emojis()
     punctuation_score_dict.update(emoji_scores)
+    print("Run mit C="+str(svm_C)+" und gamma="+str(svm_gamma))
     # Train the model
     train()
     # Test the model
     test()
+    end_time = datetime.now()
+    duration = end_time - start_time
+    print("Full Run Duration: " + str(duration))
 
 
 # feature_list: ["!", "?", "!", ...]
@@ -190,10 +198,10 @@ def train():
     data_frame = get_feature_data(training_text)
     pre_data = preprocessor.fit_transform(data_frame)
     encoded_labels = label_encoder.fit_transform(training_label)
+    mapping = dict(zip(label_encoder.transform(label_encoder.classes_), label_encoder.classes_))
+    print(mapping)
 
-    # Oversample profanity to 800 samples
     strategy = {1: 2500, 3: 1000}
-
     oversample = SVMSMOTE(sampling_strategy=strategy, n_jobs=-1)
     oversampled_data, oversampled_label = oversample.fit_resample(pre_data, encoded_labels)
 

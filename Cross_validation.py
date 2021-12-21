@@ -161,7 +161,6 @@ def get_feature_data(text):
                 clean.append(lemma.lower())
 
         clean_text = " ".join(clean)
-        doc = nlp(clean_text)
 
         punctuation_score = scale_feature(punctuation)
         punctuation_scores.append(punctuation_score)
@@ -194,7 +193,7 @@ def train():
     global svm_model
 
     svm_model = Pipeline([
-        ('clf-svm', svm.SVC(class_weight=None, C=6, gamma=0.15, kernel="rbf"))
+        ('clf-svm', svm.SVC(class_weight=None, C=6, gamma=0.35, kernel="rbf"))
     ])
 
     print("Get training features...")

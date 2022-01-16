@@ -8,3 +8,6 @@ train/germeval2019.training_subtask1_2_korrigiert.txt
 *.png
 
 *.pyc
+
+evaluation/
+images/

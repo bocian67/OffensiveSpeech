@@ -2,7 +2,6 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas
 from sklearn.model_selection import GridSearchCV
 
 gs_clf = 0
@@ -79,9 +78,6 @@ def evaluateModelAccuracy(predicted, original, mapping):
         'PROFANITY': 0,
         'OTHER': 0
     }
-
-    # original (0) -> mapping(zahl -> klasse)
-    #   predicted(0) -> mapping(zahl -> klasse)
 
     for i in range(len(predicted)):
         if mapping[original[i]] == "INSULT":

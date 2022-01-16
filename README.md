@@ -7,6 +7,17 @@
     ```
 
 # Benutzung
+Training und Testing mittels der bereitgestellten Daten:
 ```bash
 python main.py
+```
+
+Cross-Validation:
+```bash 
+python Cross_validation.py
+```
+
+Gridsearch (Parametersuche)
+```bash
+python gridsearch.py
 ```

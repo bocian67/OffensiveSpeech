@@ -2,7 +2,6 @@ import emojis
 import pandas as pd
 import spacy
 from imblearn.over_sampling import SMOTE
-from matplotlib.colors import Normalize
 from nltk.corpus import stopwords
 from sklearn import svm, metrics
 from sklearn.compose import ColumnTransformer
@@ -19,7 +18,6 @@ from preprocess_constants import *
 # download('stopwords')
 
 # WICHTIG: download im terminal mit:
-# python -m spacy download de_core_news_lg
 nlp = spacy.load("de_core_news_lg")
 
 ## Constants

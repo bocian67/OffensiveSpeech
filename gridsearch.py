@@ -56,20 +56,13 @@ svm_model = Pipeline([
 
 
 def main():
-    start_time = datetime.now()
     global insult_list
     insult_list = preprocess_insults()
     emoji_scores = preprocess_emojis()
     punctuation_score_dict.update(emoji_scores)
     print("Run mit C="+str(svm_C)+" und gamma="+str(svm_gamma))
     # Train the model
-    train()
-    # Test the model
-    test()
-    end_time = datetime.now()
-    duration = end_time - start_time
-    print("Full Run Duration: " + str(duration))
-
+    gridsearch()
 
 # feature_list: ["!", "?", "!", ...]
 def scale_feature(feature_list):
@@ -184,7 +177,7 @@ def get_feature_data(text):
     return data_frame
 
 
-def train():
+def gridsearch():
     global training_text
     global test_text
     global training_label
@@ -207,43 +200,17 @@ def train():
 
     ###
     # Gridsearch options
-    #C_range = [2, 4, 6, 8, 10, 12, 14]
-    #gamma_range = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35]
-    #parameters = {
-    #    'clf-svm__C': C_range,
-    #    'clf-svm__gamma': gamma_range,
-    #}
-    #search_for_parameters(svm_model, oversampled_data, oversampled_label, parameters)
+    C_range = [2, 4, 6, 8, 10, 12, 14, 16]
+    gamma_range = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]
+    parameters = {
+        'clf-svm__C': C_range,
+        'clf-svm__gamma': gamma_range,
+    }
+    search_for_parameters(svm_model, oversampled_data, oversampled_label, parameters)
 
-    ####
-    ## Plot GridSearch options
-    #get_plot(gamma_range, C_range)
-
-    print("Make model fit...")
-    start = datetime.now()
-    svm_model = svm_model.fit(oversampled_data, oversampled_label)
-    end = datetime.now()
-    duration = end - start
-    print("Fit duration: " + str(duration))
-
-
-def test():
-    global svm_model
-    global preprocessor
-    print("Get testing features...")
-    data_frame = get_feature_data(test_text)
-    print("Predict...")
-
-    fitted_data = preprocessor.transform(data_frame)
-
-    encoded_label = label_encoder.transform(test_label)
-    mapping = dict(zip(label_encoder.transform(label_encoder.classes_), label_encoder.classes_))
-    predicted_svm = svm_model.predict(fitted_data)
-
-    print("Support Vector Maschine:\n" + str(np.mean(predicted_svm == encoded_label)))
-    print(metrics.classification_report(encoded_label, predicted_svm))
-
-    evaluation.evaluateModelAccuracy(predicted_svm, encoded_label, mapping)
+    ###
+    # Plot GridSearch options
+    get_plot(gamma_range, C_range)
 
 
 if __name__ == '__main__':

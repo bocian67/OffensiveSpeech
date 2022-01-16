@@ -1,226 +1,241 @@
-## for data
-import matplotlib.pyplot as plt
-import numpy as np
+import emojis
 import pandas as pd
-import seaborn as sns
 import spacy
+from imblearn.over_sampling import SMOTE, SVMSMOTE
+from matplotlib.colors import Normalize
+from nltk import download
 from nltk.corpus import stopwords
 from sklearn import svm, metrics
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
-## for machine learning
-from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
-from sklearn.feature_selection import SelectPercentile, chi2
-from sklearn.linear_model import LogisticRegression, SGDClassifier
-from sklearn.model_selection import cross_val_score, GridSearchCV
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.svm import LinearSVC
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 
-# download('stopwords')
+import evaluation
+from evaluation import *
+from get_dataset import get_data
+from preprocess_constants import *
 
-# WICHTIG: download im terminal mit:
-# python -m spacy download de_core_news_lg
+download('stopwords')
+
 nlp = spacy.load("de_core_news_lg")
 
-## for explainer
-
+## Constants
 # This should be our data
-# categories = ["OTHER", "INSULT", "ABUSE", "PROFANITY"]
-categories = ["INSULT", "ABUSE", "PROFANITY"]
+categories = ["INSULT", "ABUSE", "PROFANITY", "OTHER"]
 
-"""
-We performed minimal pre-processing by:
-• replacing all mentions/usernames with the
-generic form User;
-• removing the line break characters |LBR|;
-• removing the hash character from all hashtags;
-(• remove emojis)
-• removing stop words using the Python module
-stop-words
-
-TODO:
-SVM weight!
--> SVM weighting
--> n-gramme
--> features like cites
--> features like #
-"""
+# Scores
+punctuation_score_dict = {
+    "!": 1,
+    "?": 1,
+    "default_emoji": 0
+}
 
 training_text = []
 training_label = []
 test_text = []
 test_label = []
+insult_list = []
+
+label_encoder = LabelEncoder()
+
+svm_C = 8
+svm_gamma = 0.4
+
+preprocessor = ColumnTransformer(
+        [
+            ('tweets', TfidfVectorizer(stop_words=stopwords.words("german"), ngram_range=(1, 1)), 'tweets'),
+            ('scaler', MinMaxScaler(), ["hashtags", "mentions"])
+        ],
+        remainder='passthrough', verbose_feature_names_out=True, n_jobs=-1)
+
+svm_model = Pipeline([
+        ('clf-svm', svm.SVC(class_weight=None, C=svm_C, gamma=svm_gamma, kernel="rbf"))
+    ])
 
 
 def main():
+    start_time = datetime.now()
+    global insult_list
+    insult_list = preprocess_insults()
+    emoji_scores = preprocess_emojis()
+    punctuation_score_dict.update(emoji_scores)
+    print("Run mit C="+str(svm_C)+" und gamma="+str(svm_gamma))
     # Train the model
-    clf = train()
+    train()
     # Test the model
-    test(clf)
+    test()
+    end_time = datetime.now()
+    duration = end_time - start_time
+    print("Full Run Duration: " + str(duration))
 
 
-def get_pos(tweet):
-    text = ""
-    doc = nlp(tweet)
-    for token in doc:
-        text += str(token.text) + "_" + str(token.tag_) + " "
-    return text
+# feature_list: ["!", "?", "!", ...]
+def scale_feature(feature_list):
+    score = 0.0
+    for position in range(len(feature_list)):
+        if feature_list[position] in punctuation_score_dict:
+            emoji_score = punctuation_score_dict[feature_list[position]]
+        else:
+            emoji_score = punctuation_score_dict["default_emoji"]
+        score += (0.5 ** position) * emoji_score
+    return score
+
+
+def get_feature_data(text):
+    # Clean text data (lemma)
+    training_text_clean = []
+
+    # Count of user mentions
+    mentions = []
+
+    # Count of hashtags
+    hashtags = []
+
+    # Currently not used
+    question_mark_numbers = []
+    exclamation_mark_numbers = []
+
+    punctuation_scores = []
+
+    emoji_scores = []
+
+    insult_count = []
+
+    # Add features
+    for item in text:
+        # spaCy lemma
+        # später pipeline durch aufrufe ändern -> performance
+        doc = nlp(item)
+        clean = []
+        hashtag_count = 0
+        mention_count = 0
+        exclamation_mark_score = 0
+        question_mark_score = 0
+        punctuation = []
+        tweet_emojis = []
+        insult_item_count = 0
+        scaled_emoji_feature = 0
+
+        # Emoji classification
+        # Classification Score was not improved; try to use categorical attributes? Maybe with threshold?
+        # or use transformer to alter the scores that the SVC use it properly to classify
+        emoji_iter = emojis.iter(item)
+        for emoji in emoji_iter:
+            tweet_emojis.append(emoji)
+        if len(tweet_emojis) > 0:
+            scaled_emoji_feature = scale_feature(tweet_emojis)
+        emoji_scores.append(scaled_emoji_feature)
+
+        for token in doc:
+            t = token.text
+            lemma = token.lemma_
+            # Preprocess text
+            # Is text a user mention?
+            if t.__contains__("@"):
+                lemma = "USER"
+                mention_count += 1
+            # Is text a hashtag
+            elif t.startswith("#"):
+                lemma = t[1:]
+                t = t[1:]
+                hashtag_count += 1
+            # Is text "!" or "?"
+            elif t == "!":
+                punctuation.append(t)
+                exclamation_mark_score += 1
+
+            elif t == "?":
+                punctuation.append(t)
+                question_mark_score += 1
+
+            #########
+            # Check insults from wordlist
+            if t in insult_list:
+                insult_item_count += 1
+
+            # Add text if it is not LBR
+            if t != "|LBR|":
+                clean.append(lemma.lower())
+
+        clean_text = " ".join(clean)
+
+        punctuation_score = scale_feature(punctuation)
+        punctuation_scores.append(punctuation_score)
+        exclamation_mark_numbers.append(exclamation_mark_score)
+        question_mark_numbers.append(question_mark_score)
+        hashtags.append(hashtag_count)
+        mentions.append(mention_count)
+        training_text_clean.append(clean_text)
+        insult_count.append(insult_item_count)
+
+    data_frame = pd.DataFrame(
+        {
+            "tweets": training_text_clean,
+            "hashtags": hashtags,
+            "mentions": mentions,
+            "punctuation_score": punctuation_scores,
+            "emoji_scores": emoji_scores,
+            "insult_count": insult_count
+        }
+    )
+    return data_frame
 
 
 def train():
-    print("Begin training")
-    # Open the training file
-    training = open("data/training_text.txt", "r", encoding="utf-8")
-    testing = open("data/training_label.txt", "r", encoding="utf-8")
-    for line in training:
-        text = line.rstrip("\n")
-        text = get_pos(text)
-        training_text.append(text)
+    global training_text
+    global test_text
+    global training_label
+    global test_label
+    global preprocessor
+    global svm_model
 
-    for line in testing:
-        text = line.rstrip("\n")
-        training_label.append(text)
+    training_text, training_label, test_text, test_label = get_data()
+    print("Get training features...")
 
-    training.close()
-    testing.close()
+    data_frame = get_feature_data(training_text)
+    pre_data = preprocessor.fit_transform(data_frame)
+    encoded_labels = label_encoder.fit_transform(training_label)
+    mapping = dict(zip(label_encoder.transform(label_encoder.classes_), label_encoder.classes_))
+    print(mapping)
 
-    ## Count vectorizer
-    # count_vect = CountVectorizer(stop_words=stopwords.words("german"))
-    # X_train_counts = count_vect.fit_transform(training_text)
-    ## TD-IDF transformation
-    # tfidf_transformer = TfidfTransformer()
-    # X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
-    ## train svm
+    strategy = {1: 2500, 3: 1000}
+    oversample = SVMSMOTE(sampling_strategy=strategy, n_jobs=-1)
+    oversampled_data, oversampled_label = oversample.fit_resample(pre_data, encoded_labels)
 
-    # trainedsvm = svm.SVC(kernel='rbf').fit(X_train_tfidf, training_label)
-    #
-    # text_clf_svm = Pipeline([('vect', CountVectorizer(stop_words=stopwords.words('german'))),
-    #                         ('tfidf', TfidfTransformer()),
-    #                         ('clf-svm', SGDClassifier(loss='hinge', penalty='l2', alpha=1e-3, random_state=42,
-    #                                                   n_iter_no_change=5))])
-
-    # Add features
-
-    #data_frame = pd.DataFrame(
-    #    {
-    #        "tweets": training_text,
-    #    }
-    #)
-
-    #preprocessor = ColumnTransformer(
-    #    [('tweets',
-    #      Pipeline(
-    #          [
-    #              ('vect', CountVectorizer(stop_words=stopwords.words('german'), ngram_range=(1, 3))),
-    #              ('tfidf', TfidfTransformer(use_idf=True))
-    #          ]), ['tweets']),
-    #     ('tags',
-    #      OneHotEncoder(handle_unknown="ignore"), ["tags"])],
-    #    remainder='drop', verbose_feature_names_out=True)
-
-    text_clf_svm = Pipeline([
-        ("vect", CountVectorizer(stop_words=stopwords.words("german"), ngram_range=(1,3))),
-        ('tfidf', TfidfTransformer(use_idf=True)),
-        ('clf-svm', svm.SVC(kernel='rbf', C=10.0, gamma=0.1, class_weight="balanced"))])
-
-    # C_range = np.logspace(-2, 10, 13)
-    # gamma_range = np.logspace(-9, 3, 13)
-
-    # parameters = {
-    #    'vect__ngram_range': [(1, 1), (1, 2), (1, 3), (1, 4), (1, 5)],
-    # }
-
-    # gs_clf = GridSearchCV(text_clf_svm, parameters, cv=5, n_jobs=-1)
-    # gs_clf = gs_clf.fit(training_text, training_label)
-
-    # print("Best Score: " + str(gs_clf.best_score_))
-    # print("Best Params: \n")
-    # print(gs_clf.best_score_)
-    # for param_name in sorted(parameters.keys()):
-    #    print("%s: %r" % (param_name, gs_clf.best_params_[param_name]))
-
-    text_clf_svm = text_clf_svm.fit(training_text, training_label)
-
-    return text_clf_svm
+    print("Make model fit...")
+    start = datetime.now()
+    svm_model = svm_model.fit(oversampled_data, oversampled_label)
+    end = datetime.now()
+    duration = end - start
+    print("Fit duration: " + str(duration))
 
 
-def test(clf):
-    training = open("data/testing_text.txt", "r", encoding="utf-8")
-    testing = open("data/testing_label.txt", "r", encoding="utf-8")
-    for line in training:
-        text = line.rstrip("\n")
-        test_text.append(text)
+def test():
+    global svm_model
+    global preprocessor
+    global test_text
 
-    for line in testing:
-        text = line.rstrip("\n")
-        test_label.append(text)
+    print("Get testing features...")
+    data_frame = get_feature_data(test_text)
+    print("Predict...")
 
-    training.close()
-    testing.close()
+    fitted_data = preprocessor.transform(data_frame)
 
-    ## Count vectorizer
-    # count_vect = CountVectorizer(stop_words=stopwords.words("german"))
-    # X_train_counts = count_vect.fit_transform(test_text)
-    ## TD-IDF transformation
-    # tfidf_transformer = TfidfTransformer()
-    # X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
-    # print("Begin test...")
-    ##predicted_svm = clf.predict(test_text)
+    encoded_label = label_encoder.transform(test_label)
+    mapping = dict(zip(label_encoder.transform(label_encoder.classes_), label_encoder.classes_))
+    predicted_svm = svm_model.predict(fitted_data)
 
-    predicted_svm = clf.predict(test_text)
+    with open("evaluation/Leichtmatrosen_fine_2.txt", encoding="utf-8", mode="w") as f:
+        for i in range(len(predicted_svm)):
+            output = test_text[i] + "\t" + mapping[predicted_svm[i]] + "\n"
+            print(output)
+            f.write(output)
 
-    print("Support Vector Maschine:\n" + str(np.mean(predicted_svm == test_label)))
-    print(metrics.classification_report(test_label, predicted_svm, target_names=categories))
+    print("Support Vector Maschine:\n" + str(np.mean(predicted_svm == encoded_label)))
+    print(metrics.classification_report(encoded_label, predicted_svm))
 
-
-def test_models():
-    models = [
-        RandomForestClassifier(n_estimators=200, max_depth=3, random_state=0),
-        LinearSVC(),
-        MultinomialNB(),
-        LogisticRegression(random_state=0),
-    ]
-    CV = 5
-    cv_df = pd.DataFrame(index=range(CV * len(models)))
-
-    # Open the training file
-    # Open the training file
-    training = open("data/training_text.txt", "r", encoding="utf-8")
-    testing = open("data/training_label.txt", "r", encoding="utf-8")
-    for line in training:
-        text = line.rstrip("\n")
-        training_text.append(text)
-
-    for line in testing:
-        text = line.rstrip("\n")
-        training_label.append(text)
-
-    training.close()
-    testing.close()
-
-    print("Begin training")
-
-    # Count vectorizer
-    count_vect = CountVectorizer(stop_words=stopwords.words("german"))
-    X_train_counts = count_vect.fit_transform(training_text)
-    # TD-IDF transformation
-    tfidf_transformer = TfidfTransformer()
-    X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
-
-    entries = []
-    for model in models:
-        model_name = model.__class__.__name__
-        print("Model: " + model_name)
-        accuracies = cross_val_score(model, X_train_tfidf, training_label, scoring='accuracy', cv=CV)
-        for fold_idx, accuracy in enumerate(accuracies):
-            entries.append((model_name, fold_idx, accuracy))
-    cv_df = pd.DataFrame(entries, columns=['model_name', 'fold_idx', 'accuracy'])
-    sns.boxplot(x='model_name', y='accuracy', data=cv_df)
-    sns.stripplot(x='model_name', y='accuracy', data=cv_df,
-                  size=8, jitter=True, edgecolor="gray", linewidth=2)
-    plt.show()
+    evaluation.evaluateModelAccuracy(predicted_svm, encoded_label, mapping)
 
 
 if __name__ == '__main__':

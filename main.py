@@ -1,8 +1,7 @@
 import emojis
 import pandas as pd
 import spacy
-from imblearn.over_sampling import SMOTE, SVMSMOTE
-from matplotlib.colors import Normalize
+from imblearn.over_sampling import SVMSMOTE
 from nltk import download
 from nltk.corpus import stopwords
 from sklearn import svm, metrics

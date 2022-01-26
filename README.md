@@ -1,5 +1,5 @@
 # Installation
-- Im terminal (Es wird angenommen dass Python 3 installiert ist):
+- Im terminal (Es wird angenommen dass Python <= 3.9 installiert ist):
     ```bash
     pip3 install -r requirements.txt
     python3 -m spacy download de_core_news_lg

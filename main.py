@@ -1,6 +1,7 @@
 import emojis
 import pandas as pd
 import spacy
+import os
 from imblearn.over_sampling import SVMSMOTE
 from nltk import download
 from nltk.corpus import stopwords
@@ -224,6 +225,12 @@ def test():
     encoded_label = label_encoder.transform(test_label)
     mapping = dict(zip(label_encoder.transform(label_encoder.classes_), label_encoder.classes_))
     predicted_svm = svm_model.predict(fitted_data)
+
+    eval_path = "evaluation"
+    exists_eval_path = os.path.exists(eval_path)
+
+    if not exists_eval_path:
+        os.makedirs(eval_path)
 
     with open("evaluation/Leichtmatrosen_fine_2.txt", encoding="utf-8", mode="w") as f:
         for i in range(len(predicted_svm)):
